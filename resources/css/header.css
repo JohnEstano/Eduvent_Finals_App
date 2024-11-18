@@ -1,0 +1,12 @@
+.arrow-button {
+    display: flex;
+    align-items: center;
+    color: black;
+    transition: background-color 0.3s ease;
+}
+
+.arrow-button:hover {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    color: #1a1b1b !important;
+}

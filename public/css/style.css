@@ -1,0 +1,21 @@
+body{ 
+    overflow-x: hidden;
+    background-color: #f5f5f5;
+    padding-top: 80px;
+    color: #333;
+}
+.navbar {
+    transition: background-color 0.3s ease-in-out; 
+}
+
+
+
+.navbar.scrolled {
+    background-color: white; 
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+

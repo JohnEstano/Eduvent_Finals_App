@@ -7,9 +7,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\AttendanceController;
 
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::get('/', [EventController::class, 'welcome'])->name('welcome');
 
 Route::middleware([
     'auth:sanctum',
@@ -44,3 +42,4 @@ Route::put('/users/{id}', [UserController::class, 'update'])->name('users.update
 Route::get('/events/today', [EventController::class, 'showeventsToday'])->name('events.today');
 Route::resource('attendances', AttendanceController::class);
 
+    

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Event;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use App\Models\Attendance;
 
 class EventController extends Controller
 {
@@ -26,6 +27,7 @@ class EventController extends Controller
         return view('event.createEvent');
     }
 
+  
     /**
      * Store a newly created resource in storage.
      */
@@ -39,9 +41,10 @@ class EventController extends Controller
             'end_time' => 'required|date_format:H:i',
             'status' => 'required|string',
             'description' => 'required|string|max:500',
+            'requirement' => 'nullable|string|max:500', // Optional validation for 'requirement'
         ]);
-
-
+    
+        // Create the event
         $event = Event::create([
             'name' => $request->name,
             'description' => $request->description,
@@ -53,25 +56,41 @@ class EventController extends Controller
             'requirement' => $request->requirement,
             'created_by' => auth()->id(),
         ]);
-
-        $events = Event::all();
-
-
-        return view('event.showEvent', compact('events'));
+    
+        // Fetch data for the view
+        $allEvents = Event::all();
+        $userEvents = Event::where('created_by', auth()->id())->get();
+    
+        // Return the view with the necessary data
+        return view('event.showEvent', compact('allEvents', 'userEvents'));
     }
     /**
      * Display the specified resource.
      */
     public function show()
-    {
-        // Fetch all events
-        $events = Event::all();
+{
+    // Fetch all events
+    $allEvents = Event::all();
 
+    // Fetch events created by the authenticated user
+    $userEvents = Event::where('created_by', auth()->id())->get();
 
+    // Return the data to the view
+    return view('event.showEvent', compact('allEvents', 'userEvents'));
+}
 
-        // Return the data to the view
-        return view('event.showEvent', compact('events'));
-    }
+public function welcome()
+{
+    // Fetch events where the date is in the future
+    $upcomingEvents = Event::where('date', '>=', now())
+        ->orderBy('date', 'asc')
+        ->take(5) // Limit to 5 events
+        ->get();
+
+    // Pass the data to the welcome view
+    return view('welcome', compact('upcomingEvents'));
+}
+
 
     /**
      * Show the form for editing the specified resource.
@@ -100,6 +119,35 @@ class EventController extends Controller
         
         return view('layouts.contents.onlyevents-today', compact('events'));
     }
+
+    public function showUserEvents()
+    {
+        $user = Auth::user(); // Get the authenticated user
+        $today = Carbon::today(); // Get today's date
+    
+        // Exclude upcoming events (tomorrow, next day, etc.)
+        $events = Event::whereDate('date', '<', $today)
+            ->where('status', 'Open') // Optional: filter by events with 'Open' status
+            ->get();
+    
+        // Check attendance for each event
+        $eventsWithStatus = $events->map(function ($event) use ($user) {
+            // Check if the user has attended the event
+            $attendance = Attendance::where('event_name', $event->name)
+                ->where('user_id', $user->id)
+                ->whereDate('timein', '<=', Carbon::today())
+                ->first();
+    
+            // Mark as attended if record exists, otherwise missed
+            $event->status = $attendance ? 'attended' : 'missed';
+    
+            return $event;
+        });
+    
+        // Pass the correct variable to the view
+        return view('layouts.contents.showuserevents', compact('eventsWithStatus'));
+    }
+    
 
     public function update(Request $request, string $id)
     {

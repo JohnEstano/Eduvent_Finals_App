@@ -1,4 +1,5 @@
 <head>
+
     <style>
         * {
             font-weight: bold;
@@ -19,6 +20,8 @@
             overflow: hidden;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             background-color: #fff;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         #video {
@@ -117,6 +120,23 @@
 <div class="container d-flex justify-content-center align-items-center flex-column">
     @forelse($events as $event)
         <div class="col p-4 d-flex flex-column position-static">
+
+            @if (session('success'))
+                <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1050;">
+                    <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="toast-header">
+                            <strong class="me-auto text-success">Success</strong>
+                            <button type="button" class="btn-close" data-bs-dismiss="toast"
+                                aria-label="Close"></button>
+                        </div>
+                        <div class="toast-body">
+                            {{ session('success') }}
+                        </div>
+                    </div>
+                </div>
+            @endif
+
+
             <h3
                 class="
             @if ($event->status === 'Ongoing') text-success
@@ -148,16 +168,32 @@
             </p>
 
             <!-- Event Description -->
-            <p class="card-text mb-auto text-center mt-1 text-muted">{{ $event->description }}</p>
+            <p class="card-text mb-auto text-muted description" id="eventDescription">
+                {{ Str::limit($event->description, 100) }} <span class="read-more" onclick="toggleDescription()"></span>
+            </p>
 
-            <!-- Time In/ Time out Button -->
-            <button type="button"
-                class="bg-dark text-decoration-none text-white arrow-button mt-4 rounded 
-                {{ in_array($event->status, ['Event Ended', 'Starting Soon']) ? 'd-none' : '' }}"
-                id="{{ $event->user_has_time_in ? 'timeOutButton' : 'timeInButton' }}"
-                onclick="handleTimeInOutClick({{ $event->id }}, {{ $event->user_has_time_in ? 'false' : 'true' }}, '{{ $event->name }}')">
-                {{ $event->user_has_time_in ? 'Time Out' : 'Time In' }}
-            </button>
+            @if ($event->user_has_time_in && $event->user_has_time_out)
+                <p class="mt-4   text-secondary p-2 rounded">Your attendance was recorded.</p>
+            @else
+                <button type="button"
+                    class="bg-dark text-decoration-none text-white arrow-button mt-4 rounded
+    {{ in_array($event->status, ['Event Ended', 'Starting Soon']) || ($event->user_has_time_in && $event->user_has_time_out) ? 'd-none' : '' }}"
+                    id="{{ $event->user_has_time_in && !$event->user_has_time_out ? 'timeOutButton' : 'timeInButton' }}">
+                    {{ $event->user_has_time_in && !$event->user_has_time_out ? 'Time Out' : 'Time In' }}
+                </button>
+            @endif
+
+
+
+            @if ($errors->any())
+                <div class="alert alert-danger">
+                    <ul>
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
         </div>
     @empty
         <p class="text-center">No events available for today.</p>
@@ -175,19 +211,11 @@
             </div>
             <div class="modal-body">
 
-                <form id="attendanceForm" method="POST" enctype="multipart/form-data"
+                <form id="attendanceForm" method="POST"
                     action="{{ route('attendances.store') }}">
                     @csrf
                     <div class="row g-3">
-                        @if ($errors->any())
-                            <div class="alert alert-danger">
-                                <ul>
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
+
                         <!-- Step 1: User and Event Information -->
                         <div id="step1" class="form-step">
                             <h4>Step 1: User and Event Information</h4>
@@ -221,27 +249,21 @@
                                 during the event.</p>
                             <div id="camera-container">
                                 <video id="video" autoplay></video>
-                                <button type="button" onclick="takePicture()">Take Selfie</button>
+                                <button type="button" id="takeSelfieButton" onclick="takePicture()">Take Selfie</button>
+
                             </div>
-                            <input type="file" id="photoInput" name="timein_photo" class="d-none">
-                            <input type="time" id="time_in" name="time_in">
+                          
+                            <input type="text" id="timein_photo" name="timein_photo">
+                            <input type="text" id="timeout_photo" name="timeout_photo">
+                            
                         </div>
 
                         <!-- Remarks and Status -->
-                        <div class="form-group">
-                            <label for="remarks">Remarks</label>
-                            <textarea id="remarks" name="remarks" class="form-control" placeholder="Enter remarks"></textarea>
-                        </div>
 
-                        <div class="form-group">
-                            <label for="status">Status</label>
-                            <select id="status" name="status" class="form-control">
-                                <option value="Present">Present</option>
-                                <option value="Absent">Absent</option>
-                                <option value="Late">Late</option>
-                                <option value="Excused">Excused</option>
-                            </select>
-                        </div>
+
+                        <textarea id="remarks" name="remarks" style="display: none" class="form-control" placeholder="Enter remarks"
+                            value="attended"></textarea>
+
 
                         <!-- Submit Button -->
                         <div class="modal-footer">
@@ -268,34 +290,36 @@
 
 
 <script>
-
-document.getElementById('attendanceForm').addEventListener('submit', function(e) {
-        var timeInput = document.getElementById('time_in');
-        var timeValue = timeInput.value;
-
-        // Check if time is in correct H:i format
-        if (timeValue && timeValue.length === 5) {
-            // Ensure it doesn't add seconds (keep as HH:MM)
-            timeInput.value = timeValue; // just in case, ensure it's in H:i format
-        }
-    });
     let currentStep = 1;
     const maxSteps = 3;
     let isTimeIn = false;
     let eventId;
+
     document.addEventListener("DOMContentLoaded", function() {
         const timeInButton = document.getElementById("timeInButton");
         const timeOutButton = document.getElementById("timeOutButton");
 
         // Get the event name dynamically from the Blade view
         const eventName = document.getElementById("eventNameinthecard").innerText;
-        const eventId = 1; // You can dynamically pass the actual event ID as needed
+        eventId = 1; 
+
+        // Initialize the modal
+        const modal = new bootstrap.Modal(document.getElementById('attendanceModal'));
+
+        document.addEventListener("DOMContentLoaded", function() {
+    const takeSelfieButton = document.getElementById("takeSelfieButton"); 
+    if (takeSelfieButton) {
+        takeSelfieButton.addEventListener("click", function() {
+            takePicture();
+        });
+    }
+});
 
         if (timeInButton) {
             timeInButton.addEventListener("click", function() {
                 isTimeIn = true;
                 const authUser = @json(Auth::user()); // Get the authenticated user
-                showModal(eventId, eventName, authUser);
+                showModal(eventId, eventName, authUser, modal);
             });
         }
 
@@ -303,57 +327,106 @@ document.getElementById('attendanceForm').addEventListener('submit', function(e)
             timeOutButton.addEventListener("click", function() {
                 isTimeIn = false;
                 const authUser = @json(Auth::user()); // Get the authenticated user
-                showModal(eventId, eventName, authUser);
+                showModal(eventId, eventName, authUser, modal);
             });
         }
 
         // Event listener for modal close action
-        const modal = document.getElementById('attendanceModal');
-        if (modal) {
-            const closeButton = modal.querySelector('[data-bs-dismiss="modal"]');
-
-            // Close modal and stop camera on close button click
-            if (closeButton) {
-                closeButton.addEventListener('click', function() {
-                    stopCamera(); // Stop the camera when the modal is closed
-                });
-            }
-
-            // Also stop the camera when clicking outside the modal (if modal has backdrop)
-            modal.addEventListener('hidden.bs.modal', function() {
+        const closeButton = document.querySelector('[data-bs-dismiss="modal"]');
+        if (closeButton) {
+            closeButton.addEventListener('click', function() {
                 stopCamera(); // Stop the camera when the modal is closed
+            });
+        }
+
+        // Close modal and stop camera on modal hidden
+        modal._element.addEventListener('hidden.bs.modal', function() {
+            stopCamera(); // Stop the camera when the modal is closed
+        });
+
+        // Initialize nextStepButton for modal step navigation
+        const nextStepButton = document.getElementById("nextStepButton");
+        if (nextStepButton) {
+            nextStepButton.addEventListener("click", function() {
+                if (currentStep === 1) {
+                    // When moving to Step 2, trigger the location retrieval
+                    findMyState();
+                } else if (currentStep === 2) {
+                    startCamera(); // Start the camera when on step 2
+                }
+
+                // Move to the next step
+                currentStep++;
+                if (currentStep > maxSteps) {
+                    submitForm(); // Submit the form if max steps are reached
+                } else {
+                    showStep(currentStep);
+                }
+
+                // Stop the camera if we leave step 3
+                if (currentStep !== 3) {
+                    stopCamera();
+                }
             });
         }
     });
 
-    if (nextStepButton) {
-        nextStepButton.addEventListener("click", function() {
-            if (currentStep === 1) {
-                // When moving to Step 2, trigger the location retrieval
-                findMyState();
-            } else if (currentStep === 2) {
-                startCamera(); // Start the camera when on step 2
-            }
+    function showModal(eventId, eventName, authUser, modal) {
+        // Reset the current step to 1 each time the modal is opened
+        currentStep = 1;
 
-            // Move to the next step
-            currentStep++;
-            if (currentStep > maxSteps) {
-                submitForm(); // Submit the form if max steps are reached
-            } else {
-                showStep(currentStep);
-            }
+        // Set the event name in the hidden input and display it in the modal
+        document.getElementById("event_name").value = eventName;
+        document.getElementById("event_namez").innerText = eventName;
 
-            // Stop the camera if we leave step 3
-            if (currentStep !== 3) {
-                stopCamera();
-            }
-        });
+        // Set user-specific data in the modal
+        document.getElementById("user_id").value = authUser.id;
+        document.getElementById("student_id").innerText = authUser.student_id;
+        document.getElementById("user_name").innerText = authUser.name;
+
+        // Update the user's profile photo
+        const userPhoto = document.getElementById("user_photo");
+        userPhoto.src = authUser.profile_photo_url ||
+            'default-photo.jpg'; // Default photo if user has no profile picture
+
+        // Update the modal title based on Time In or Time Out
+        const modalTitle = document.getElementById("attendanceModalLabel");
+        const nextButton = document.getElementById("nextStepButton");
+
+        if (isTimeIn) {
+            modalTitle.innerText = "Time In";
+        } else {
+            modalTitle.innerText = "Time Out";
+        }
+
+        // Reset to step 1
+        showStep(1);
+
+        // Show the modal (if it's not already open)
+        modal.show();
     }
 
-    let actionType = '';
+    function showStep(stepNumber) {
+        // Hide all steps first
+        const steps = document.querySelectorAll('.form-step');
+        steps.forEach((step) => {
+            step.classList.add('d-none');
+        });
 
-    // Function to start the camera
-    function startCamera() {
+        // Show the selected step
+        const currentStep = document.getElementById(`step${stepNumber}`);
+        currentStep.classList.remove('d-none');
+    }
+
+    // Ensure the location field is ready for input
+    document.getElementById("location").value = ""; // Can dynamically set based on geolocation
+
+    // Reset and show the first step
+    currentStep = 1;
+    showStep(currentStep);
+
+    function startCamera(action) {
+        actionType = action;
         const cameraContainer = document.getElementById('camera-container');
         const video = document.getElementById('video');
 
@@ -367,113 +440,63 @@ document.getElementById('attendanceForm').addEventListener('submit', function(e)
             .catch((err) => console.error("Camera access denied: ", err));
     }
 
-    // Function to stop the camera
-    function stopCamera() {
-        const video = document.getElementById('video');
-        const stream = video.srcObject;
-        const tracks = stream ? stream.getTracks() : [];
-
-        tracks.forEach(track => track.stop()); // Stop each track in the stream
-        video.srcObject = null; // Remove the video stream from the video element
-    }
-
-    function showStep(stepNumber) {
-        // Hide all steps first
-        const steps = document.querySelectorAll('.step');
-        steps.forEach((step) => {
-            step.style.display = 'none';
-        });
-
-        // Show the selected step
-        const currentStep = document.getElementById(`step-${stepNumber}`);
-        currentStep.style.display = 'block';
-
-        // Stop the camera if we're not on step 3
-        if (stepNumber !== 3) {
-            stopCamera();
-        } else {
-            startCamera();
-        }
-    }
-
-    // Function to take a picture
     function takePicture() {
-        const video = document.getElementById('video');
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        const context = canvas.getContext('2d');
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const selfieDataUrl = canvas.toDataURL('image/png');
-        const selfieInput = document.getElementById('photoInput');
-        selfieInput.files = createFileFromDataUrl(selfieDataUrl);
-
-        stopCamera(); // Stop the camera after taking the picture
-        showStep(4); // Move to the next step
+    const video = document.getElementById("video");
+    if (!video.srcObject) {
+        console.error("No video stream found.");
+        alert("Camera not initialized. Please try again.");
+        return;
+    }
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    // Ensure video dimensions are available
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.error("Video stream has no dimensions.");
+        alert("Unable to retrieve video dimensions.");
+        return;
     }
 
-    // Helper function to create a File object from a data URL
-    function createFileFromDataUrl(dataUrl) {
-        const binary = atob(dataUrl.split(',')[1]);
-        const array = [];
-        for (let i = 0; i < binary.length; i++) {
-            array.push(binary.charCodeAt(i));
-        }
-        return new File([new Blob([new Uint8Array(array)])], 'selfie.png', {
-            type: 'image/png'
-        });
+    // Set the canvas size to match the video dimensions
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw the current frame of the video onto the canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert the image to a base64 string
+    const photoDataUrl = canvas.toDataURL('image/jpeg');
+
+    // Set the photo input to the base64-encoded image
+ 
+
+    // Send the photo type based on whether the user is time-in or time-out
+    if (isTimeIn) {
+        document.getElementById('timein_photo').value = photoDataUrl;
+    } else {
+        document.getElementById('timeout_photo').value = photoDataUrl;
     }
 
+    console.log("Selfie taken and data passed to input fields.");
+    stopCamera();
+}
 
 
-
-
-
-    const modal = document.getElementById('modal'); // Adjust with your modal's ID
-    const modalContent = document.getElementById('modal-content'); // Adjust to the actual content div of your modal
-
-    // Function to stop the camera
     function stopCamera() {
         const video = document.getElementById('video');
         const stream = video.srcObject;
-        const tracks = stream ? stream.getTracks() : [];
+        const tracks = stream.getTracks();
 
-        tracks.forEach(track => track.stop()); // Stop each track in the stream
-        video.srcObject = null; // Remove the video stream from the video element
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+        document.getElementById('camera-container').style.display = 'none';
     }
-    // Check if the modal exists and add listeners
-    if (modal) {
-        // Check if modal has a close or hide method (if you're using a library/modal framework)
-        if (typeof modal.close === 'function') {
-            modal.addEventListener('close', function() {
-                stopCamera(); // Stop the camera when modal is closed
-            });
-        }
-
-        // Add an event listener to close the modal when clicking outside of it
-        document.addEventListener('click', function(event) {
-            // Check if the click is outside the modal content
-            if (modal && !modalContent.contains(event.target)) {
-                modal.close(); // Close the modal
-                stopCamera(); // Stop the camera when clicking outside
-            }
-        });
-
-        // If you're using a close button, listen for that as well
-        const closeButton = document.getElementById('close-modal'); // Adjust with the close button's ID
-        if (closeButton) {
-            closeButton.addEventListener('click', function() {
-                modal.close(); // Close the modal
-                stopCamera(); // Stop the camera when clicking the close button
-            });
-        }
-    }
-
 
 
     function findMyState() {
+
+
         const status = document.querySelector('.status');
 
         const success = (position) => {
@@ -519,70 +542,6 @@ document.getElementById('attendanceForm').addEventListener('submit', function(e)
             status.textContent = 'Geolocation is not supported by this browser.';
         }
     }
-
-    function showModal(eventId, eventName, authUser, isTimeIn) {
-    // Set the event name in the hidden input
-    document.getElementById("event_name").value = eventName;  // Update to event_name instead of event_id
-
-    // Set user-specific data
-    document.getElementById("user_id").value = authUser.id;
-    document.getElementById("student_id").innerText = authUser.student_id;
-    document.getElementById("user_name").innerText = authUser.name;
-    document.getElementById("event_namez").innerText = eventName;  // Display event name
-
-    // Update the user's profile photo
-    const userPhoto = document.getElementById("user_photo");
-    userPhoto.src = authUser.profile_photo_url || 'default-photo.jpg';
-
-    // Update modal title and configure inputs for Time In/Out
-    const modalTitle = document.getElementById("attendanceModalLabel");
-    const nextButton = document.getElementById("nextStepButton");
-
-    if (isTimeIn) {
-        modalTitle.innerText = "Time In";
-        nextButton.innerText = "Start Attendance";
-
-        // Get the current time in HH:mm format
-        const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const currentTime = `${hours}:${minutes}`;
-
-        // Set the current time as the value of the time_in input
-        document.getElementById("time_in").value = currentTime;
-
-        // Dynamically set photo input name for time_in
-        document.getElementById("photoInput").name = "timein_photo";
-    } else {
-        modalTitle.innerText = "Time Out";
-        nextButton.innerText = "Next";
-
-        // Clear time_in and dynamically set the photo input name for time_out
-        document.getElementById("time_in").value = "";
-        document.getElementById("photoInput").name = "timeout_photo";
-    }
-
-    // Ensure the location field is ready for input
-    document.getElementById("location").value = ""; // Can dynamically set based on geolocation
-
-    // Reset and show the first step
-    currentStep = 1;
-    showStep(currentStep);
-
-    // Show the modal
-    var modalElement = document.getElementById('attendanceModal');
-    var modal = new bootstrap.Modal(modalElement);
-
-    modal.show();
-
-    // Add cleanup logic on modal close
-    modalElement.addEventListener('hidden.bs.modal', function() {
-        document.getElementById("attendanceForm").reset();
-        document.getElementById("step1").classList.remove('d-none');
-        document.getElementById("step2").classList.add('d-none');
-        document.getElementById("step3").classList.add('d-none');
-    });
-}
 
     function showStep(step) {
         for (let i = 1; i <= maxSteps; i++) {

@@ -42,41 +42,39 @@ class UserController extends Controller
     }
 
 
-
     public function store(Request $request)
     {
-
+        // Validate input data
         $request->validate([
             'name' => 'required|string|max:255',
-            'student_id' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'role' => 'required|string',
-            'password' => 'required|string|min:8',
-            'profile_photo_path' => 'nullable|image|mimes:jpg,png,jpeg,gif,svg|max:2048',
+            'student_id' => 'required|string|max:255|unique:users,student_id',  // Ensures student_id is unique
+            'email' => 'required|email|unique:users,email',  // Ensures email is unique
+            'role' => 'required|string|in:student,admin',  // Validates the role is either student or admin
+            'password' => 'required|string|min:8',  // Validates password is at least 8 characters long
+            'profile_photo_path' => 'nullable|image|mimes:jpg,png,jpeg,gif,svg|max:2048',  // Validates image for profile photo
         ]);
-
-
+    
+        // Create new user
         $user = User::create([
             'name' => $request->name,
             'student_id' => $request->student_id,
             'email' => $request->email,
             'role' => $request->role,
-            'password' => bcrypt($request->password),
+            'password' => bcrypt($request->password), // Encrypt password
         ]);
-
-
+    
+        // Handle profile photo upload if available
         if ($request->hasFile('profile_photo_path')) {
             $user->updateProfilePhoto($request->file('profile_photo_path'));
         }
-
-
+    
+        // Get paginated list of users to show on the 'showUser' view
         $users = User::paginate(5);
-
-
+    
+        // Return the user list view with success message
         return view('user.showUser', compact('users'))->with('success', 'User created successfully.');
     }
-
-
+    
 
     public function update(Request $request, string $id)
     {
@@ -104,7 +102,7 @@ class UserController extends Controller
             'student_id' => $data['student_id'],
             'email' => $data['email'],
             'role' => $data['role'],
-            'password' => $data['password'] ? bcrypt($data['password']) : $user->password, // Encrypt new password if provided
+        
         ]);
 
 

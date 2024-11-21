@@ -6,16 +6,19 @@
         }
 
         .container {
-            width: 90%;
+            width: 103%;
             display: flex;
             gap: 20px;
             padding: 20px;
+            
         }
 
         .sections {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             padding: 20px;
             background-color: white;
+            
+           
         }
 
         .profile-section {
@@ -52,6 +55,7 @@
         .date-time-section i {
             font-size: 4rem;
             color: #FFAA33;
+           
         }
 
         .date-time-section h3 {
@@ -61,7 +65,7 @@
 </head>
 
 <body>
-    <div class="container mt-10">
+    <div class="container" style="margin-top: 130px !important;">
 
 
        

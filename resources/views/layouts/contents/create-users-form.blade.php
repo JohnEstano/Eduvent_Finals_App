@@ -46,8 +46,8 @@
         <div class="col-sm-12 mb-3">
             <label for="role" class="form-label">Role</label>
             <select name="role" class="form-control">
-                <option value="Student">Student</option>
-                <option value="Officer">Admin</option>
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
             </select>
         </div>
 

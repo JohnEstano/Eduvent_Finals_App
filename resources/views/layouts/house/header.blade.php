@@ -34,25 +34,25 @@
         <div class="d-flex justify-content-end flex-grow-1">
             <ul class="nav nav-underline">
                 <li class="nav-item">
-                    <a class="gray-button text-decoration-none rounded-2 text-muted" aria-current="page"
-                        href="{{ route('home') }}">
+                    <a class="gray-button text-decoration-none rounded-2 text-muted" aria-current="page" href="{{ route('home') }}">
                         <i class="bi bi-house-door-fill h6 mx-1 my-2 ms-2 me-1 rounded"></i> Home &nbsp;
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="{{ route('attendanceToday') }}"
-                        class="gray-button text-decoration-none rounded-2 text-muted">
+                    <a href="{{ route('attendanceToday') }}" class="gray-button text-decoration-none rounded-2 text-muted">
                         <i class="bi bi-clipboard-check-fill h6 mx-1 my-2 ms-2 me-1 rounded"></i> Attendance&nbsp;&nbsp;
                     </a>
                 </li>
-
+        
+                <!-- Show the Manage link only for admin -->
+                @if (auth()->user()->role === 'admin') 
                 <li class="nav-item">
                     <a class="gray-button text-decoration-none rounded-2 text-muted" href="{{ route('events.show') }}">
                         <i class="bi bi-grid-fill h6 mx-1 my-2 ms-2 me-1 rounded"></i> Manage &nbsp;
                     </a>
                 </li>
+                @endif
             </ul>
-
         </div>
             @include('layouts.house.header-right-auth')
         @endauth

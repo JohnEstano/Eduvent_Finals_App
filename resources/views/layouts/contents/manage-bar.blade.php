@@ -19,15 +19,16 @@
 </head>
 
 <body>
-    <div class="sidebar mt-10">
+    <div class="sidebar ms-3 mt-10">
         <div class="navbar-nav">
-            <a href="{{route('users')}}" class="nav-link text-dark hover:text-warning">Users</a>
-            <a href="" class="nav-link text-dark hover:text-warning">Teams</a>
-            <a href="{{route('events.show')}}" class="nav-link text-dark hover:text-warning">Events</a>
-            <a href="{{ route('attendances.create') }}" class="nav-link text-dark hover:text-warning">Records</a>
-
+            @if(Auth::check() && Auth::user()->student_id === '000')
+                <a href="{{ route('users') }}" class="nav-link text-dark hover:text-warning">Users</a>
+            @endif
+            <a href="{{ route('events.show') }}" class="nav-link text-dark hover:text-warning">Events</a>
+            <a href="{{ route('attendances.index') }}" class="nav-link text-dark hover:text-warning">Records</a>
         </div>
     </div>
+    
 
   
 

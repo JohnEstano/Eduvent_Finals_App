@@ -7,31 +7,56 @@ use App\Models\Attendance;
 use App\Models\User;
 use Carbon\carbon;
 use App\Models\Event;
+use App\Processors\TimeInProcessor;
+use App\Processors\TimeOutProcessor;
+
+
 
 class AttendanceController extends Controller
 {
-    public function index()
+   
+
+    public function index(Request $request)
     {
-        $attendances = Attendance::paginate(10);
-        return view('attendance.showAttendance', compact('attendances'));
+        // Fetch all events created by the authenticated user
+        $userEvents = Event::where('created_by', auth()->id())->get();
+        
+        // If an event is selected, filter attendance records for that event
+        $attendances = collect(); // Initialize as an empty collection
+        if ($request->has('event_name') && $request->event_name) {
+            // Get attendance records for the selected event by event_name
+            $attendances = Attendance::where('event_name', $request->event_name)->paginate(10);
+            
+            // Convert time_in and time_out to 12-hour format
+            foreach ($attendances as $attendance) {
+                $attendance->time_in = Carbon::parse($attendance->time_in)->format('g:i A'); // 12-hour format with AM/PM
+                $attendance->time_out = Carbon::parse($attendance->time_out)->format('g:i A');
+            }
+        }
+    
+        // Return the data to the view
+        return view('attendance.showAttendance', compact('userEvents', 'attendances'));
     }
+    
+    
+    
 
     public function today()
     {
         // Set today's date and current time in the correct timezone
         $today = Carbon::today('Asia/Manila');
         $currentTime = Carbon::now('Asia/Manila');
-
+    
         // Fetch events for today with an "Open" status
         $events = Event::whereDate('date', $today)
             ->where('status', 'Open')
             ->get();
-
+    
         // Add status and attendance info to each event
         $events = $events->map(function ($event) use ($currentTime) {
             $startTime = Carbon::parse($event->start_time, 'Asia/Manila');
             $endTime = Carbon::parse($event->end_time, 'Asia/Manila');
-
+    
             // Determine event status
             if ($currentTime->between($startTime, $endTime)) {
                 $event->status = 'Ongoing';
@@ -42,20 +67,23 @@ class AttendanceController extends Controller
             } else {
                 $event->status = 'Unknown';
             }
-
-            // Check if the authenticated user has a time_in record for this event
+    
+            // Check if the authenticated user has a time_in and time_out record for this event
             $event->user_has_time_in = Attendance::where('event_name', $event->name)
                 ->where('user_id', auth()->id())
                 ->whereNotNull('time_in')
                 ->exists();
-
+    
+            $event->user_has_time_out = Attendance::where('event_name', $event->name)
+                ->where('user_id', auth()->id())
+                ->whereNotNull('time_out')
+                ->exists();
+    
             return $event;
         });
-
+    
         return view('attendance.today', compact('events'));
     }
-
-
 
     public function create()
     {
@@ -63,7 +91,7 @@ class AttendanceController extends Controller
         return view('attendance.recordAttendance', compact('users'));
     }
 
-
+    
     public function store(Request $request)
     {
         // Validate the incoming data
@@ -71,37 +99,31 @@ class AttendanceController extends Controller
             'event_name' => 'required|exists:events,name',
             'user_id' => 'required|exists:users,id',
             'location' => 'required|string',
-            'timein_photo' => 'nullable|image',
-            'time_in' => 'required|date_format:H:i',  // Ensure proper time format
+            'timein_photo' => 'nullable|string',
+            'timeout_photo' => 'nullable|string',
             'remarks' => 'nullable|string',
-            'status' => 'required|in:Present,Absent,Late,Excused',
         ]);
-        
-        // Save the data into the database
-        $attendance = new Attendance();
-        $attendance->event_name = $validated['event_name'];
-        $attendance->user_id = $validated['user_id'];
-        $attendance->location = $validated['location'];
-        
-        // Format time_in as HH:MM:SS to match the MySQL TIME format
-        $attendance->time_in = date('H:i:s', strtotime($validated['time_in']));  // Append seconds
-        
-        $attendance->remarks = $validated['remarks'] ?? null;
-        $attendance->status = $validated['status'];
-        
-        // Handle the photo upload (if applicable)
-        if ($request->hasFile('timein_photo')) {
-            $path = $request->file('timein_photo')->store('public/photos');
-            $attendance->timein_photo = $path;
-        }
-        
-        // Save the attendance record
-        $attendance->save();
-        
-        // Redirect or return a success response
-        return redirect()->route('attendanceToday')->with('success', 'Attendance recorded successfully!');
-    }
     
+        $attendance = Attendance::where('event_name', $validated['event_name'])
+                                 ->where('user_id', $validated['user_id'])
+                                 ->whereNull('time_out')
+                                 ->first();
+    
+        if ($attendance) {
+            // Use TimeOutProcessor
+            $processor = new TimeOutProcessor();
+            $processor->process($attendance, $request);
+    
+            return redirect()->route('attendanceToday')->with('success', 'Recorded Successfully!');
+        } else {
+            // Use TimeInProcessor
+            $attendance = new Attendance($validated);
+            $processor = new TimeInProcessor();
+            $processor->process($attendance, $request);
+    
+            return redirect()->route('attendanceToday')->with('success', 'Recorded Successfully!');
+        }
+    }
     
     
     

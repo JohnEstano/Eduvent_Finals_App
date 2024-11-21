@@ -928,8 +928,18 @@
             <!-- Card Section (Upcoming Events) -->
             <div class="bg-white rounded-xl shadow-lg p-6 text-center">
                 <h3 class="text-xl font-semibold text-gray-800">Upcoming Events</h3>
-                <p class="mt-4 text-gray-500">Stay tuned for exciting events coming soon!</p>
-                <!-- You can add placeholders for event details here -->
+                @if ($upcomingEvents->isEmpty())
+                    <p class="mt-4 text-gray-500">No upcoming events at the moment.</p>
+                @else
+                    <ul class="mt-4 text-gray-500">
+                        @foreach ($upcomingEvents as $event)
+                            <li class="mb-2">
+                                <strong>{{ $event->name }}</strong> <br>
+                                <span class="text-sm">{{ $event->date}}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
         </div>
         

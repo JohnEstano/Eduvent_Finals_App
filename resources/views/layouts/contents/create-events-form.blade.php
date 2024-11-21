@@ -3,6 +3,18 @@
     @method('post')
     <div class="row g-3">
 
+        <div class="row g-3">
+            <div class="row g-3">
+                @if ($errors->any())
+            <div class="alert alert-danger">
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <!-- Event Name -->
         <div class="col-sm-12 mb-2">
             <label for="name" class="form-label">Event Name</label>

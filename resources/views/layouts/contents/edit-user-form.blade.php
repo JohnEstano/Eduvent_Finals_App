@@ -39,17 +39,14 @@
             <!-- Password -->
 
 
-            <input type="hidden" name="password" id="password" value="{{ $user->password }}" required
-                class="form-control">
-
 
             <!-- Role -->
             <div class="col-sm-12 mb-3">
                 <label for="role" class="form-label">Role</label>
                 <select name="role" class="form-control">
 
-                    <option value="Student" {{ $user->role == 'Student' ? 'selected' : '' }}>Student</option>
-                    <option value="Officer" {{ $user->role == 'Officer' ? 'selected' : '' }}>Officer</option>
+                    <option value="student" {{ $user->role == 'student' ? 'selected' : '' }}>Student</option>
+                    <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>Admin</option>
                 </select>
             </div>
 
